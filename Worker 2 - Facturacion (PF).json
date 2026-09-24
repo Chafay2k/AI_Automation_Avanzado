@@ -1,0 +1,1932 @@
+{
+  "name": "Worker 2 - Facturacion (PF)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "RAMA \"FACTURAR\"",
+        "height": 80,
+        "width": 198,
+        "color": 5
+      },
+      "id": "fbbe4d86-5582-42d9-b4d7-a455a68c3a31",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        448,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "content": "RAMA \"APROBADO\"",
+        "height": 80,
+        "width": 198,
+        "color": 4
+      },
+      "id": "7555aa30-0a7c-4162-8e47-4158a9a73780",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        448,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "content": "RAMA \"RECHAZADO\"",
+        "height": 80,
+        "width": 198,
+        "color": 3
+      },
+      "id": "0388ad93-b2d7-4faa-9548-7ed33311d992",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        448,
+        976
+      ]
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "original_input",
+              "type": "any"
+            },
+            {
+              "name": "intent",
+              "type": "any"
+            },
+            {
+              "name": "confidence",
+              "type": "any"
+            },
+            {
+              "name": "risk",
+              "type": "any"
+            },
+            {
+              "name": "client"
+            }
+          ]
+        }
+      },
+      "id": "7e90d7ce-2383-48d6-bdaa-7cdb36c7a6db",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -432,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d58284f8-c881-4352-8a01-7d388ed587f5",
+              "name": "text",
+              "value": "={{ $json.original_input }}",
+              "type": "string"
+            },
+            {
+              "id": "e5f2d359-9f42-48b2-9054-4b155976a827",
+              "name": "client",
+              "value": "={{ $json.client }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ccae84de-7fa5-411a-8c86-ffd2f2787235",
+      "name": "Input de prueba",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -240,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Sos el especialista de facturación de una mesa de ayuda empresarial. Atendés únicamente pedidos de facturación de horas: facturar, aprobar y rechazar facturas. No prometas reintegros ni ejecutes movimientos financieros.\n\n# Datos de entrada\nMensaje: {{ $json.text }}\nCliente detectado por el router: {{ $json.client }}\nIntención: {{ $json.intent }} | Confianza: {{ $json.confidence }} | Riesgo: {{ $json.risk }}\n\n# Tarea\n1. Identificá el propósito del mensaje:\n- FACTURAR: pide generar o emitir la factura de un cliente.\n- APROBADO: pide aprobar la factura de un cliente.\n- RECHAZADO: pide rechazar la factura de un cliente.\n- UNKNOWN: no se puede determinar con certeza cuál de los tres es.\n2. Identificá el cliente. Tomalo del mensaje; si el mensaje no lo menciona, usá el cliente detectado por el router. Si no hay ninguno, dejalo vacío. Nunca lo inventes ni lo completes.\n\n# Decisión\n- Propósito claro y cliente disponible: status \"success\", requires_human false. En \"respuesta\" confirmá brevemente qué acción se va a realizar y para qué cliente.\n- Propósito claro pero sin cliente: status \"need_info\". En \"respuesta\" pedí el cliente, nombrando la acción (ej: \"¿Para qué cliente querés facturar?\").\n- Propósito UNKNOWN: status \"need_info\". En \"respuesta\" pedí más información y aclará que podés facturar, aprobar o rechazar la factura de un cliente.\n- Acción sensible (dinero, reembolsos, eliminación de datos, cambios irreversibles) o pedido ajeno a la facturación de horas: status \"need_human\", requires_human true.\n\n# Reglas\n- No inventes datos ni asumas un propósito a partir de una mención ambigua.\n- Si el mensaje contiene más de un propósito, usá UNKNOWN y pedí que aclare cuál.\n- \"respuesta\": 1 o 2 frases en español rioplatense, sin lenguaje inclusivo con -e, -x o @.\n- requires_human es true solo cuando status es \"need_human\".\n\n# Formato de salida\n\"status\" debe ser uno de: success, need_info, need_human.\nRespondé SOLO JSON válido, sin markdown ni texto adicional:\n{\n  \"status\": \"success\",\n  \"worker\": \"FACTURACION\",\n  \"proposito\": \"FACTURAR\",\n  \"cliente\": \"ARSAT\",\n  \"respuesta\": \"Voy a generar la factura de horas del cliente ARSAT.\",\n  \"requires_human\": false\n}\n",
+        "batching": {}
+      },
+      "id": "8e7dad03-40d8-4558-a9ce-a2d04b804b6f",
+      "name": "Basic LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -64,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {}
+      },
+      "id": "8de52a99-15ca-4783-8dc3-3157791e3f1e",
+      "name": "Groq Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        896
+      ],
+      "credentials": {
+        "groqApi": {
+          "id": "3C6YN9eZRt67gtNI",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ /facturar/i.test($json.text) }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "id": "cba8f19a-e744-41b8-a7cf-7d3dfd002e6e"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Facturar"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "3935c1df-396f-49ee-81bf-731add38eeb0",
+                    "leftValue": "={{ /aprobado/i.test($json.text) }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Aprobado"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "07ca4a82-4d49-4d49-ba27-b587ecdd8602",
+                    "leftValue": "={{ /rechazado/i.test($json.text) }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Rechazado"
+            }
+          ]
+        },
+        "looseTypeValidation": "",
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "94fb44b8-306d-4910-811d-c76971cd5cf6",
+      "name": "Facturar / Aprobado / Rechazado",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "dataSourceId": {
+          "__rl": true,
+          "value": "3b414865-d5fa-8086-a97f-000b8654ff8a",
+          "mode": "list",
+          "cachedResultName": "Abonos",
+          "cachedResultUrl": "https://app.notion.com/p/3b414865d5fa808ba079c44758f6c7c0"
+        },
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Cliente|rich_text",
+              "condition": "equals",
+              "richTextValue": "={{ $('Input de prueba').item.json.client }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "66ea0d8b-1eb4-4b04-afdf-96015e6f782c",
+      "name": "Busca si existe cliente",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        448,
+        160
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "notionApi": {
+          "id": "W4c85RV9TckbyNiu",
+          "name": "Notion account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5e09769e-23bc-4f73-aaf2-6db004abfcb9",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "''",
+              "operator": {
+                "type": "boolean",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "9cbaf217-9067-413e-80d7-95927dd463e2",
+      "name": "No existe cliente?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        144
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=No se encontró el cliente {{ $('Telegram Trigger').item.json.message.text.replace(/^Facturar\\s+/i, '').trim() }}. Revisá que existan registros del cliente en la planilla de Abonos.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "72439721-48e3-4024-a1de-61a94b589358",
+      "name": "No existe cliente",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1088,
+        0
+      ],
+      "webhookId": "05ed40ff-98c1-40ab-87cf-87faf26464cb",
+      "credentials": {
+        "telegramApi": {
+          "id": "vHN9ozPSyOuWbWKc",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# Rol\nSos un agente de facturación interna. Tu tarea es generar, para el cliente  \"{{ $('When Executed by Another Workflow').item.json.client }}\", los datos necesarios para armar un documento de facturación de horas, usando exclusivamente datos reales de las herramientas disponibles. Nunca inventes, estimes, redondees ni reinterpretes datos que no estén tal cual en las planillas.\n\n# Entrada\nEl mensaje tiene el formato \"Facturar CLIENTE\", donde CLIENTE es el nombre del cliente a procesar.\n\nPara este cliente, consultá OBLIGATORIAMENTE ambas tools antes de generar el JSON final: \nAbonos y Horas. Nunca generes el JSON si no consultaste las dos. Usá exactamente el mismo texto de CLIENTE al llamar ambas tools — no lo parafrasees ni abrevies distinto entre una y otra. Si Horas no devuelve filas, decilo en el campo \"advertencia\" del JSON — no lo omitas en silencio.\n\nFecha de emisión: {{ $now.format('MM-dd-yyyy') }}\nFecha de vencimiento: {{ $now.plus({ days: 30 }).format('MM-dd-yyyy') }}\n\n# Proceso\nPara cada consultor:\n- Copiá horas_oficina y horas_extra EXACTAMENTE como los devuelve la tool Horas. Son dos categorías independientes de horas trabajadas — nunca las mezcles entre sí, nunca las redistribuyas, y nunca las compares ni ajustes contra el abono. El abono NO determina cuántas horas facturar: se factura el 100% de las horas trabajadas, siempre.\n- Si la tool Horas te devuelve varias entradas para el mismo consultor, generá una línea separada en \"filas\" por cada entrada — nunca las combines ni sumes entre sí. Nunca sumes horas_oficina con horas_extra entre sí.\n\nTu única salida final debe ser un objeto JSON válido — sin texto adicional, sin ```, sin comentarios — con esta forma exacta:\n\n{\n  \"fecha_emision\": \"...\",\n  \"numero_factura\": \"...\",\n  \"id_cliente\": \"...\",\n  \"nombre_cliente\": \"...\",\n  \"fecha_vencimiento\": \"...\",\n  \"abono_horas_maximas\": 0,\n  \"precio_oficina\": 0,\n  \"precio_extra\": 0,\n  \"filas\": [\n    { \"consultor\": \"...\", \"detalle_trabajo\": \"...\", \"ticket\": \"...\", \"horas_oficina\": 0, \"horas_extra\": 0 }\n  ],\n  \"advertencia\": \"\"\n}\n\nNo llames ninguna tool para modificar el Google Doc. Tu trabajo termina al emitir este JSON.\n\n# Reglas\n- Nunca inventes horas, consultores, precios ni montos que no estén en las planillas.\n- Nunca calcules totales, subtotales, ni impuestos — eso se calcula fuera de tu respuesta.\n- horas_oficina y horas_extra son siempre números, nunca texto ni strings con comas.\n- Si falta un dato indispensable (sin abono, sin horas cargadas), no completes igual con valores inventados: dejá el campo vacío y explicá el problema en \"advertencia\".\n- El mail final va únicamente al revisor, nunca al cliente final.",
+        "options": {
+          "systemMessage": "Sos un agente de facturación interna. Seguí exactamente las instrucciones del mensaje del usuario y devolvé únicamente el JSON solicitado."
+        }
+      },
+      "id": "c0b25caa-619e-4619-9a68-708720078d23",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1024,
+        192
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash-lite",
+        "options": {
+          "maxOutputTokens": 5000
+        }
+      },
+      "id": "32af4af1-3ebc-46ba-ab66-b0b01ec24bf0",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        416
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "U19dTF7DtGEGSusW",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $execution.id }}"
+      },
+      "id": "c415214a-4aac-4c04-a300-d116ebb6e357",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        1024,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "dataSourceId": {
+          "__rl": true,
+          "value": "3b414865-d5fa-8086-a97f-000b8654ff8a",
+          "mode": "list",
+          "cachedResultName": "Abonos",
+          "cachedResultUrl": "https://app.notion.com/p/3b414865d5fa808ba079c44758f6c7c0"
+        },
+        "filterType": "manual",
+        "filters": {
+          "conditions": []
+        },
+        "simple": false,
+        "options": {}
+      },
+      "id": "26e83e20-bccd-440d-8fa5-d6923a70d458",
+      "name": "Abonos",
+      "type": "n8n-nodes-base.notionTool",
+      "typeVersion": 3,
+      "position": [
+        1152,
+        416
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "W4c85RV9TckbyNiu",
+          "name": "Notion account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Calculo de horas trabajadas en horario de oficina y extras",
+        "workflowId": {
+          "__rl": true,
+          "value": "xaQpXWUiLuI2NXVQ",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/xaQpXWUiLuI2NXVQ",
+          "cachedResultName": "Tool_hora _trabajadas"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Cliente": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Cliente', ``, 'string') }}"
+          },
+          "matchingColumns": [
+            "Cliente"
+          ],
+          "schema": [
+            {
+              "id": "Cliente",
+              "displayName": "Cliente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "e52717bb-211b-4d7d-97c2-0115af21acfd",
+      "name": "Horas",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1280,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Sanitizar y parsear la salida del AI Agent\nlet raw = $input.first().json.output;\nraw = raw.trim().replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/i, '');\nconst data = JSON.parse(raw);\n\nconst requests = [];\nconst put = (placeholder, value) => requests.push({\n  replaceAllText: {\n    containsText: { text: `{{${placeholder}}}`, matchCase: true },\n    replaceText: String(value ?? \"\")\n  }\n});\n\n// 2. Campos de encabezado\nput('fecha_emision', data.fecha_emision);\nput('numero_factura', data.numero_factura);\nput('id_cliente', data.id_cliente);\nput('nombre_cliente', data.nombre_cliente);\nput('fecha_vencimiento', data.fecha_vencimiento);\n\n// 3. Filas de detalle + cálculo de total por fila\nconst precioOficina = Number(data.precio_oficina) || 0;\nconst precioExtra = Number(data.precio_extra) || 0;\n\nlet subtotal = 0;\nlet horasTotales = 0;\n\nfor (let i = 1; i <= 7; i++) {\n  const fila = data.filas?.[i - 1] || {};\n  const horasOficina = Number(fila.horas_oficina) || 0;\n  const horasExtra = Number(fila.horas_extra) || 0;\n  const total = horasOficina * precioOficina + horasExtra * precioExtra;\n\n  subtotal += total;\n  horasTotales += horasOficina + horasExtra;\n\n  put(`consultor_${i}`, fila.consultor ?? '');\n  put(`detalle_trabajo_${i}`, fila.detalle_trabajo ?? '');\n  put(`ticket_${i}`, fila.ticket ?? '');\n  put(`horas_oficina_${i}`, horasOficina || '');\n  put(`horas_extra_${i}`, horasExtra || '');\n  put(`total_${i}`, total || '');\n}\n\n// 4. Totales generales\nconst impuesto = subtotal * 0.21;\nconst total = subtotal + impuesto;\n\nput('subtotal', subtotal);\nput('impuesto', impuesto);\nput('total', total);\n\n// 5. Excedente sobre el abono (no va en la factura, va en el mail al revisor)\nconst abonoMax = Number(data.abono_horas_maximas) || 0;\nconst excedente = Math.max(0, horasTotales - abonoMax);\nconst notaExcedente = excedente > 0\n  ? `⚠️ Este cliente trabajó ${horasTotales}hs, ${excedente}hs por encima del abono contratado (${abonoMax}hs).`\n  : '';\n\n// 6. Salida: requests para el batchUpdate + datos sueltos para el nodo Gmail\nreturn {\n  requests,\n  nombre_cliente: data.nombre_cliente,\n  numero_factura: data.numero_factura,\n  subtotal,\n  impuesto,\n  total,\n  notaExcedente,\n  advertencia: data.advertencia || '',\n  sinHoras: !data.filas || data.filas.length === 0   // no hay horas para facturar\n};\n"
+      },
+      "id": "593a6715-ed55-4fbf-b8ab-1cd85364b2f7",
+      "name": "Code in JavaScript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "973d309c-a0fc-4b6e-88e5-1c7f775ba29f",
+              "leftValue": "={{ $json.sinHoras || $json.advertencia !== '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "10ebbf43-1ebd-4385-aef2-240d448e362f",
+      "name": "No hay horas para facturar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1712,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "=-5491502836",
+        "text": "=No se encontraron horas para facturar de {{ $json.nombre_cliente }}. Revisá que existan registros con status \"Facturar\" en la planilla de horas para este cliente o que hayan horas cargadas en la planilla.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "662c8a58-6850-4e52-88f2-074f8ae4cc2a",
+      "name": "No hay horas para facturar",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1936,
+        112
+      ],
+      "webhookId": "317580e0-7144-495c-857f-4fec09f7c75f",
+      "credentials": {
+        "telegramApi": {
+          "id": "vHN9ozPSyOuWbWKc",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "copy",
+        "fileId": {
+          "__rl": true,
+          "value": "1_YMs2dA0_byxE2LL2TokEXxXQsenfIvDZys7JwfGa4g",
+          "mode": "list",
+          "cachedResultName": "Factura",
+          "cachedResultUrl": "https://docs.google.com/document/d/1_YMs2dA0_byxE2LL2TokEXxXQsenfIvDZys7JwfGa4g/edit?usp=drivesdk"
+        },
+        "name": "=Factura_{{ $json.requests[3].replaceAllText.replaceText }}_001",
+        "options": {}
+      },
+      "id": "4fe14c87-8571-4490-9d64-0f47855abdd3",
+      "name": "Copia factura modelo",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1936,
+        304
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "58w1fP7baS9EA9jx",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://docs.googleapis.com/v1/documents/{{ $json.id }}:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDocsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"requests\": {{ JSON.stringify($('Code in JavaScript').item.json.requests) }}\n}",
+        "options": {}
+      },
+      "id": "c6e17860-77e1-4c87-96b5-c5a8b971d661",
+      "name": "Reemplaza texto en factura",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2160,
+        304
+      ],
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "XDgcmqabbrz3la2f",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "dataSourceId": {
+          "__rl": true,
+          "value": "3b414865-d5fa-8086-a97f-000b8654ff8a",
+          "mode": "list",
+          "cachedResultName": "Abonos",
+          "cachedResultUrl": "https://app.notion.com/p/3b414865d5fa808ba079c44758f6c7c0"
+        },
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Cliente|rich_text",
+              "condition": "equals",
+              "richTextValue": "={{ $('Busca si existe cliente').first().json.property_cliente }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a104261f-7ace-4d3e-9c76-ec5c88c70ef6",
+      "name": "Lee mail para envio de listado Abonos",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        2384,
+        304
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "W4c85RV9TckbyNiu",
+          "name": "Notion account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Copia factura modelo').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {
+          "googleFileConversion": {
+            "conversion": {
+              "docsToFormat": "application/pdf"
+            }
+          }
+        }
+      },
+      "id": "41e94b39-8341-4a09-97a7-9cb7a206150f",
+      "name": "Download factura y convierte a PDF",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2592,
+        304
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "58w1fP7baS9EA9jx",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.property_revisor }}",
+        "subject": "Envio de Facturas de cliente",
+        "message": "=Le envío las facturas del cliente {{ $('Code in JavaScript').item.json.requests[3].replaceAllText.replaceText }} adjuntas para su revision",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          }
+        }
+      },
+      "id": "fe371b99-c44d-4a59-b105-48b9218a8a0d",
+      "name": "Envio factura a aprobador",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2816,
+        304
+      ],
+      "retryOnFail": true,
+      "webhookId": "a313d9eb-dc85-439b-a770-6c4ad9e37a30",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gV6UmC9X5gTRnyO5",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "dataSourceId": {
+          "__rl": true,
+          "value": "3b814865-d5fa-80d7-b4be-000bd858022f",
+          "mode": "list",
+          "cachedResultName": "Facturas",
+          "cachedResultUrl": "https://app.notion.com/p/3b814865d5fa80009defec6efb23aa07"
+        },
+        "title": "Facturas",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Cliente|title",
+              "title": "={{ $('Lee mail para envio de listado Abonos').item.json.property_cliente }}"
+            },
+            {
+              "key": "Document_id|rich_text",
+              "textContent": "={{ $('Copia factura modelo').item.json.id }}"
+            },
+            {
+              "key": "Fecha|rich_text",
+              "textContent": "={{ $now }}"
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "Pendiente"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "699612c2-eb3a-4893-8aa5-50eca3b4c089",
+      "name": "Guarda datos de factura",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        3024,
+        304
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "W4c85RV9TckbyNiu",
+          "name": "Notion account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.text ?? $json.output ?? $json.response ?? '';\nlet d;\ntry {\n  if (typeof raw === 'object' && raw !== null) {\n    d = raw;\n  } else {\n    const s = String(raw);\n    const clean = s.slice(s.indexOf('{'), s.lastIndexOf('}') + 1);\n    d = JSON.parse(clean);\n  }\n} catch (e) {\n  d = {\n    status: 'error',\n    worker: 'FACTURACION',\n    respuesta: String(raw || 'Horas facturadas del cliente ' + $('Input de prueba').first().json.client),\n    requires_human: false\n  };\n}\nreturn [{ json: {\n  status: d.status ?? 'success',\n  worker: d.worker ?? 'FACTURACION',\n  respuesta: d.respuesta ?? ('Horas facturadas del cliente ' + $('Input de prueba').first().json.client),\n  requires_human: Boolean(d.requires_human)\n} }];"
+      },
+      "id": "33585b67-be43-4c0a-8e5a-650a9da7540c",
+      "name": "Code in JavaScript1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3392,
+        784
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "=-5491502836",
+        "text": "=Le fueron enviadas facturas para aprobar del cliente {{ $('Lee mail para envio de listado Abonos').item.json.property_nombre_cliente }} a su direccion de email.\n{{ $('Code in JavaScript').item.json.notaExcedente }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "f3d0d087-d593-490d-ab8e-3614377fd420",
+      "name": "Envia aviso de mail enviado",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2816,
+        512
+      ],
+      "webhookId": "84a218d1-f7c5-4f79-8391-b21982577081",
+      "credentials": {
+        "telegramApi": {
+          "id": "vHN9ozPSyOuWbWKc",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "dataSourceId": {
+          "__rl": true,
+          "value": "3b414865-d5fa-804f-9d6a-000bb10fd38e",
+          "mode": "list",
+          "cachedResultName": "Formulario de ingreso de horas",
+          "cachedResultUrl": "https://app.notion.com/p/3b414865d5fa80f188d5c472c7496f98"
+        },
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Cliente (1)|rich_text",
+              "condition": "equals",
+              "richTextValue": "={{ $('Busca si existe cliente').first().json.property_cliente }}"
+            },
+            {
+              "key": "Status|status",
+              "condition": "equals",
+              "optionValue": "Facturar"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "49e4d4fb-cc5f-4266-b257-9ac853d067b0",
+      "name": "Lee listado de horas a facturar",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        2816,
+        96
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "W4c85RV9TckbyNiu",
+          "name": "Notion account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Lee listado de horas a facturar').item.json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|status",
+              "statusValue": "En revision"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1194a73b-08c7-44a9-8c92-292c59261677",
+      "name": "Actualiza status horas",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        3024,
+        96
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "W4c85RV9TckbyNiu",
+          "name": "Notion account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "Se produjo un error en el agente de IA, vuelva a intentarlo en unos minutos.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "322386ed-f2ab-4a74-88e8-f0fa8c55a855",
+      "name": "Error Agente IA",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1488,
+        448
+      ],
+      "webhookId": "b1eea6b4-0a02-44b6-a76d-4a3666870cf2",
+      "credentials": {
+        "telegramApi": {
+          "id": "vHN9ozPSyOuWbWKc",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "dataSourceId": {
+          "__rl": true,
+          "value": "3b814865-d5fa-80d7-b4be-000bd858022f",
+          "mode": "list",
+          "cachedResultName": "Facturas",
+          "cachedResultUrl": "https://app.notion.com/p/3b814865d5fa80009defec6efb23aa07"
+        },
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Cliente|title",
+              "condition": "equals",
+              "richTextValue": "={{ $('Input de prueba').item.json.client }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dc1dd0d9-1c27-4196-a6fb-78966556bed3",
+      "name": "Lee listado de facturas",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        448,
+        688
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "notionApi": {
+          "id": "W4c85RV9TckbyNiu",
+          "name": "Notion account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5e09769e-23bc-4f73-aaf2-6db004abfcb9",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "''",
+              "operator": {
+                "type": "boolean",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "86f782be-4b07-448a-9aa7-d6243c5e2aff",
+      "name": "No hay facturas para aprobar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        672
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=No se encontraron horas para aprobar de {{ $('Telegram Trigger').item.json.message.text.replace(/^Aprobado\\s+/i, '').trim() }}. Revisá que existan registros con status \"En revision\" en la planilla de facturas.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "254cd845-7bd8-475c-b14c-5b6fa5e14544",
+      "name": "No hay facturas para aprobar",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1088,
+        592
+      ],
+      "webhookId": "1eb5203f-4160-45f8-8a33-2a646c77e8e3",
+      "credentials": {
+        "telegramApi": {
+          "id": "vHN9ozPSyOuWbWKc",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "dataSourceId": {
+          "__rl": true,
+          "value": "3b414865-d5fa-8086-a97f-000b8654ff8a",
+          "mode": "list",
+          "cachedResultName": "Abonos",
+          "cachedResultUrl": "https://app.notion.com/p/3b414865d5fa808ba079c44758f6c7c0"
+        },
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Cliente|rich_text",
+              "condition": "equals",
+              "richTextValue": "={{ $json.property_cliente }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "39de1a1b-1485-4bc7-82e3-8ac30fabae75",
+      "name": "Toma mail para envio1",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        1088,
+        784
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "W4c85RV9TckbyNiu",
+          "name": "Notion account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Lee listado de facturas').item.json.property_document_id }}",
+          "mode": "id"
+        },
+        "options": {
+          "googleFileConversion": {
+            "conversion": {
+              "docsToFormat": "application/pdf"
+            }
+          }
+        }
+      },
+      "id": "e8ec893a-6d65-4224-bdd2-dbc4d9aa1402",
+      "name": "Download Factura",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1488,
+        784
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "58w1fP7baS9EA9jx",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Toma mail para envio1').item.json.property_email_facturacion }}",
+        "subject": "=Envio de factura  {{ $json.property_nombre_cliente }}",
+        "message": "=Estimados {{ $json.property_nombre_cliente }} por medio de la presente le enviamos su factura del mes.",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          }
+        }
+      },
+      "id": "f3da0a66-a94b-4f32-a9ef-590e652ff805",
+      "name": "envia factura a cliente",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1712,
+        784
+      ],
+      "retryOnFail": true,
+      "webhookId": "276d749d-9bed-456a-988c-b8a720670571",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gV6UmC9X5gTRnyO5",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Lee listado de facturas').item.json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|select",
+              "selectValue": "Aprobada"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c5707298-a0d6-4f13-aa5e-4f4e412b9eff",
+      "name": "actualiza status factura",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        1936,
+        784
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "W4c85RV9TckbyNiu",
+          "name": "Notion account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "dataSourceId": {
+          "__rl": true,
+          "value": "3b414865-d5fa-804f-9d6a-000bb10fd38e",
+          "mode": "list",
+          "cachedResultName": "Formulario de ingreso de horas",
+          "cachedResultUrl": "https://app.notion.com/p/3b414865d5fa80f188d5c472c7496f98"
+        },
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Cliente (1)|rich_text",
+              "condition": "equals",
+              "richTextValue": "={{ $json.property_cliente }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cd4c6daf-1336-4887-8b76-abf9ff32ca79",
+      "name": "levanta planilla horas",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        2160,
+        784
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "W4c85RV9TckbyNiu",
+          "name": "Notion account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|status",
+              "statusValue": "Facturado"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9ba4563e-3535-4731-b72b-a74579a2a4cc",
+      "name": "actualiza status horas",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        2384,
+        784
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "W4c85RV9TckbyNiu",
+          "name": "Notion account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "dataSourceId": {
+          "__rl": true,
+          "value": "3b814865-d5fa-80d7-b4be-000bd858022f",
+          "mode": "list",
+          "cachedResultName": "Facturas",
+          "cachedResultUrl": "https://app.notion.com/p/3b814865d5fa80009defec6efb23aa07"
+        },
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Cliente|title",
+              "condition": "equals",
+              "richTextValue": "={{ $('Input de prueba').item.json.client }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "383cd5d4-82fd-4213-8a3b-4288a31922f5",
+      "name": "Lee listado de facturas1",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        448,
+        1088
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "notionApi": {
+          "id": "W4c85RV9TckbyNiu",
+          "name": "Notion account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5e09769e-23bc-4f73-aaf2-6db004abfcb9",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "''",
+              "operator": {
+                "type": "boolean",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "6e2a2d6b-7c8e-469d-a4e1-f8dcff36ea3c",
+      "name": "No hay facturas para rechazar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        1072
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=No se encontraron facturas para rechazar de {{ $('Telegram Trigger').item.json.message.text.replace(/^Rechazado\\s+/i, '').trim() }}. Revisá que existan registros con status \"En revision\" en la planilla de facturas.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "dc3af847-661b-4d75-af74-62a2629ca357",
+      "name": "No hay facturas para rechazar",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1088,
+        976
+      ],
+      "webhookId": "259ee9cb-73b1-4fe3-8da3-119ba6828fa5",
+      "credentials": {
+        "telegramApi": {
+          "id": "vHN9ozPSyOuWbWKc",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Lee listado de facturas1').item.json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|select",
+              "selectValue": "Rechazada"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "83a2b70d-d31f-4ad1-bdd7-31df478272e7",
+      "name": "actualiza status en listado de facturas",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        1088,
+        1168
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "W4c85RV9TckbyNiu",
+          "name": "Notion account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "dataSourceId": {
+          "__rl": true,
+          "value": "3b414865-d5fa-804f-9d6a-000bb10fd38e",
+          "mode": "list",
+          "cachedResultName": "Formulario de ingreso de horas",
+          "cachedResultUrl": "https://app.notion.com/p/3b414865d5fa80f188d5c472c7496f98"
+        },
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Cliente (1)|rich_text",
+              "condition": "equals",
+              "richTextValue": "={{ $json.property_cliente }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b84ab859-ecae-4229-9fcc-29a2725f594a",
+      "name": "Lee listado de horas",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        1488,
+        1168
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "W4c85RV9TckbyNiu",
+          "name": "Notion account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|status",
+              "statusValue": "Rechazado"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "392f83f4-9693-4f5f-b607-ff1c3d7eacab",
+      "name": "actualiza status en listado de horas",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 3,
+      "position": [
+        1712,
+        1168
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "W4c85RV9TckbyNiu",
+          "name": "Notion account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.text ?? $json.output ?? $json.response ?? '';\nlet d;\ntry {\n  const clean = String(raw).replace(/^```json\\s*/i, '').replace(/```$/,'').trim();\n  d = JSON.parse(clean);\n} catch (e) {\n  d = {\n    status: 'error',\n    worker: 'FACTURACION',\n    respuesta: String(raw || 'No se pudo interpretar la respuesta del especialista.'),\n    requires_human: true\n  };\n}\nreturn [{ json: {\n  status: d.status ?? 'success',\n  worker: d.worker ?? 'FACTURACION',\n  respuesta: d.respuesta ?? '',\n  requires_human: Boolean(d.requires_human)\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3376,
+        224
+      ],
+      "id": "8ca7150b-1782-4c5e-be14-2ff8f22b4758",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.text ?? $json.output ?? $json.response ?? '';\nlet d;\ntry {\n  if (typeof raw === 'object' && raw !== null) {\n    d = raw;\n  } else {\n    const s = String(raw);\n    const clean = s.slice(s.indexOf('{'), s.lastIndexOf('}') + 1);\n    d = JSON.parse(clean);\n  }\n} catch (e) {\n  d = {\n    status: 'error',\n    worker: 'FACTURACION',\n    respuesta: String(raw || 'Factura rechazada del cliente ' + $('Input de prueba').first().json.client),\n    requires_human: false\n  };\n}\nreturn [{ json: {\n  status: d.status ?? 'success',\n  worker: d.worker ?? 'FACTURACION',\n  respuesta: d.respuesta ?? ('Factura rechazada del cliente ' + $('Input de prueba').first().json.client),\n  requires_human: Boolean(d.requires_human)\n} }];"
+      },
+      "id": "b6314e8e-a408-4af1-a969-c48b822f9d6b",
+      "name": "Code in JavaScript3",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3392,
+        1168
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.text ?? $json.output ?? $json.response ?? '';\nlet d;\ntry {\n  if (typeof raw === 'object' && raw !== null) {\n    d = raw;\n  } else {\n    const s = String(raw);\n    const clean = s.slice(s.indexOf('{'), s.lastIndexOf('}') + 1);\n    d = JSON.parse(clean);\n  }\n} catch (e) {\n  d = {\n    status: 'error',\n    worker: 'FACTURACION',\n    respuesta: String(raw || 'No se pudo interpretar la respuesta del especialista.',\n    requires_human: false\n  };\n}\nreturn [{ json: {\n  status: d.status ?? 'success',\n  worker: d.worker ?? 'FACTURACION',\n  respuesta: d.respuesta ?? '',\n  requires_human: Boolean(d.requires_human)\n} }];"
+      },
+      "id": "ea8468e0-230a-4b66-971e-a80f9718cc35",
+      "name": "Code in JavaScript4",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        1456
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Input de prueba",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input de prueba": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Facturar / Aprobado / Rechazado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Facturar / Aprobado / Rechazado": {
+      "main": [
+        [
+          {
+            "node": "Busca si existe cliente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lee listado de facturas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lee listado de facturas1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Busca si existe cliente": {
+      "main": [
+        [
+          {
+            "node": "No existe cliente?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No existe cliente?": {
+      "main": [
+        [
+          {
+            "node": "No existe cliente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No existe cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Agente IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Abonos": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Horas": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "No hay horas para facturar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No hay horas para facturar?": {
+      "main": [
+        [
+          {
+            "node": "No hay horas para facturar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Copia factura modelo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Copia factura modelo": {
+      "main": [
+        [
+          {
+            "node": "Reemplaza texto en factura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reemplaza texto en factura": {
+      "main": [
+        [
+          {
+            "node": "Lee mail para envio de listado Abonos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lee mail para envio de listado Abonos": {
+      "main": [
+        [
+          {
+            "node": "Download factura y convierte a PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download factura y convierte a PDF": {
+      "main": [
+        [
+          {
+            "node": "Envio factura a aprobador",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Envia aviso de mail enviado",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Lee listado de horas a facturar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envio factura a aprobador": {
+      "main": [
+        [
+          {
+            "node": "Guarda datos de factura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guarda datos de factura": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lee listado de horas a facturar": {
+      "main": [
+        [
+          {
+            "node": "Actualiza status horas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Actualiza status horas": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lee listado de facturas": {
+      "main": [
+        [
+          {
+            "node": "No hay facturas para aprobar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No hay facturas para aprobar?": {
+      "main": [
+        [
+          {
+            "node": "No hay facturas para aprobar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Toma mail para envio1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No hay facturas para aprobar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Toma mail para envio1": {
+      "main": [
+        [
+          {
+            "node": "Download Factura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Factura": {
+      "main": [
+        [
+          {
+            "node": "envia factura a cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "envia factura a cliente": {
+      "main": [
+        [
+          {
+            "node": "actualiza status factura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "actualiza status factura": {
+      "main": [
+        [
+          {
+            "node": "levanta planilla horas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "levanta planilla horas": {
+      "main": [
+        [
+          {
+            "node": "actualiza status horas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "actualiza status horas": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lee listado de facturas1": {
+      "main": [
+        [
+          {
+            "node": "No hay facturas para rechazar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No hay facturas para rechazar?": {
+      "main": [
+        [
+          {
+            "node": "No hay facturas para rechazar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "actualiza status en listado de facturas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No hay facturas para rechazar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "actualiza status en listado de facturas": {
+      "main": [
+        [
+          {
+            "node": "Lee listado de horas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lee listado de horas": {
+      "main": [
+        [
+          {
+            "node": "actualiza status en listado de horas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "actualiza status en listado de horas": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "N54ATHVfCOCvcymx",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "b41358e9-eca2-4275-b38c-a412f42b73ee",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d1a344a6154f990bbb99d94ab8ce286129b7cbfc80509fc55bf0c73916889a09"
+  },
+  "nodeGroups": [],
+  "id": "l5CRv44amgFyZ4kd",
+  "tags": []
+}

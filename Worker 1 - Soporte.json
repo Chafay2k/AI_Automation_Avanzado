@@ -1,0 +1,316 @@
+{
+  "name": "Worker 1 - Soporte",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "original_input",
+              "type": "any"
+            },
+            {
+              "name": "intent",
+              "type": "any"
+            },
+            {
+              "name": "confidence",
+              "type": "any"
+            },
+            {
+              "name": "risk",
+              "type": "any"
+            }
+          ]
+        }
+      },
+      "id": "2cbc2baf-4ab1-4b10-aba5-b91a54297fa1",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -144,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Solicitud original:\n{{ $json.original_input }}\n\n{{ $now }}\n\nIntención detectada: {{ $json.intent }}\nConfianza: {{ $json.confidence }}\nRiesgo: {{ $json.risk }}\n\nRespondé SOLO como JSON válido, sin markdown:\n{\n  \"status\": \"success\",\n  \"worker\": \"SOPORTE\",\n  \"respuesta\": \"respuesta breve y clara para el usuario\",\n  \"requires_human\": false\n}\n",
+        "options": {
+          "systemMessage": "[ROL Y ÁMBITO]\nSos un Agente de Triaje de Soporte Técnico para una empresa de soporte SAP Basis. Tu único ámbito es interpretar mensajes desestructurados de usuarios, identificar el problema principal, clasificar la prioridad y registrar un ticket limpio para que el equipo de soporte pueda actuar.\n\nNO tenés autorización para: prometer tiempos de resolución, cerrar tickets, otorgar compensaciones, modificar datos productivos, borrar registros, ejecutar acciones destructivas, brindar asesoramiento legal o comprometer decisiones comerciales.\n\n[OBJETIVO OPERATIVO]\nConvertir cada consulta entrante en un registro estructurado con: nombre del usuario, contacto, empresa, categoría del problema, prioridad, resumen del caso y próxima acción recomendada.\n\n[REGLAS DE USO DE HERRAMIENTAS]\n- Usá la herramienta \"Registrar_Ticket_Soporte\" SOLO cuando tengas datos mínimos suficientes: contacto del usuario, categoría del problema y descripción del inconveniente.\n- Si falta un dato clave, hacé una única pregunta clara antes de registrar.\n- No inventes información. Si un dato no fue provisto, dejalo vacío o marcá \"No informado\".\n- Clasificá la prioridad como Alta, Media o Baja. Alta aplica si hay bloqueo total, impacto en facturación, caída de servicio, pérdida de datos o cliente estratégico.\n- Si el mensaje mezcla varios problemas, priorizá el problema de mayor impacto y dejá el resto en notas.\n\n[PROTOCOLO DE ESCALAMIENTO / GUARDRAILS]\n- Si el usuario reporta pérdida de datos, caída generalizada, incidente de seguridad, cliente VIP o amenaza de baja, marcá prioridad Alta y recomendá revisión humana inmediata.\n- Si el usuario pide una acción destructiva o sensible, detené el ciclo y respondé: \"El caso requiere revisión humana antes de ejecutar acciones sensibles.\"\n- No envíes correos ni mensajes externos al cliente final. Solo registrá el ticket y generá un resumen operativo.\n\n[ESTILO]\n- Escribí en español rioplatense estándar, claro y profesional.\n- No uses lenguaje inclusivo con terminaciones en -e, -x o @.\n- Sé breve, específico y orientado a la operación.",
+          "maxIterations": 5
+        }
+      },
+      "id": "4a363a9d-d8b6-4bb3-834a-4e6849b17c84",
+      "name": "Agente Soporte",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        192,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {}
+      },
+      "id": "8236c529-5385-44b3-85c6-0f7224d1def1",
+      "name": "Groq Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        128,
+        320
+      ],
+      "credentials": {
+        "groqApi": {
+          "id": "3C6YN9eZRt67gtNI",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $execution.id }}"
+      },
+      "id": "befd0429-ab28-4dc6-aa87-d80b8b3277da",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        256,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Esta herramienta registra tickets de soporte técnico en Google Sheets.\n\nUSÁ esta herramienta cuando el usuario haya proporcionado como mínimo:\n- un medio de contacto;\n- un problema que pueda ser categorizado;\n- una descripción suficiente del inconveniente.\n\nAntes de ejecutar la herramienta:\n1. Identificá el problema principal reportado por el usuario.\n2. Determiná la categoría del problema.\n3. Clasificá la prioridad como Alta, Media o Baja.\n4. Generá un resumen breve y operativo del incidente.\n5. Definí una próxima acción recomendada.\n\n\nREGLAS DE PRIORIDAD:\n- ALTA: bloqueo total, impacto en facturación, caída del servicio, pérdida de datos, incidente de seguridad o cliente estratégico.\n- MEDIA: el problema afecta el trabajo del usuario, pero existe una alternativa temporal o no produce un bloqueo completo.\n- BAJA: consulta general, problema menor o solicitud sin impacto inmediato en la operación.\n\nCuando estén disponibles los datos mínimos, ejecutá esta herramienta exactamente UNA vez.\n\nNo inventes información faltante.\nSi el nombre o la empresa no fueron informados, utilizá \"No informado\".\n\nSi el mensaje contiene varios problemas, registrá como problema principal el de mayor impacto e incluí los demás en el resumen.\n\nNo uses esta herramienta para consultas comerciales, legales o administrativas que estén fuera del ámbito de soporte técnico.",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1iF3my3HPbv3-69oKCL-ZDnTdAVmiVS5IPEnoP1vxXVA",
+          "mode": "list",
+          "cachedResultName": "Registrar_ticket_soporte",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1iF3my3HPbv3-69oKCL-ZDnTdAVmiVS5IPEnoP1vxXVA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 724716286,
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1iF3my3HPbv3-69oKCL-ZDnTdAVmiVS5IPEnoP1vxXVA/edit#gid=724716286"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Contacto": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Contacto', ``, 'string') }}",
+            "Usuario": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Usuario', ``, 'string') }}",
+            "Categoria del Problema": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Categoria_del_Problema', ``, 'string') }}",
+            "Empresa": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Empresa', ``, 'string') }}",
+            "Prioridad": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prioridad', ``, 'string') }}",
+            "Resumen": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Resumen', ``, 'string') }}",
+            "Proxima accion": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Proxima_accion', ``, 'string') }}",
+            "Fecha": "={{ $now }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Ticket",
+              "displayName": "Ticket",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Fecha",
+              "displayName": "Fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Usuario",
+              "displayName": "Usuario",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Contacto",
+              "displayName": "Contacto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Empresa",
+              "displayName": "Empresa",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Categoria del Problema",
+              "displayName": "Categoria del Problema",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Prioridad",
+              "displayName": "Prioridad",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Resumen",
+              "displayName": "Resumen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Proxima accion",
+              "displayName": "Proxima accion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "e8b8f742-911c-42a8-8a9b-1a06e55cfb6d",
+      "name": "Registrar_Ticket_Soporte",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        512,
+        288
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "DpkItDV0CWXdKdA0",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.text ?? $json.output ?? $json.response ?? '';\nlet d;\ntry {\n  const clean = String(raw).replace(/^```json\\s*/i, '').replace(/```$/,'').trim();\n  d = JSON.parse(clean);\n} catch (e) {\n  d = {\n    status: 'error',\n    worker: 'SOPORTE',\n    respuesta: String(raw || 'No se pudo interpretar la respuesta del especialista.'),\n    requires_human: true\n  };\n}\nreturn [{ json: {\n  status: d.status ?? 'success',\n  worker: d.worker ?? 'SOPORTE',\n  respuesta: d.respuesta ?? '',\n  requires_human: Boolean(d.requires_human)\n} }];"
+      },
+      "id": "6d5fd413-4e20-4418-b419-c554e1001064",
+      "name": "Code in JavaScript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        80
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Agente Soporte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agente Soporte": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agente Soporte",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Agente Soporte",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar_Ticket_Soporte": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente Soporte",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "35180de2-8164-42fb-98d7-f53cca112bf0",
+  "meta": {
+    "instanceId": "d1a344a6154f990bbb99d94ab8ce286129b7cbfc80509fc55bf0c73916889a09"
+  },
+  "nodeGroups": [],
+  "id": "iPzs8UEK7oTAH8QY",
+  "tags": []
+}

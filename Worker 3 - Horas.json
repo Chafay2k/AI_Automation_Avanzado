@@ -1,0 +1,98 @@
+{
+  "name": "Worker 3 - Horas",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "chat_id",
+              "type": "any"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -128,
+        80
+      ],
+      "id": "7ddb6780-8ea7-4013-b471-0df363e2afd4",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "Para el ingreso de horas trabajadas por favor ingresa al link: https://glowing-mask-212.notion.site/3b414865d5fa801bbcb4e59e0ec5b7a8?pvs=105",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        128,
+        80
+      ],
+      "id": "66e354bd-ad87-432e-b27e-47a04b26a9b5",
+      "name": "Send a text message",
+      "webhookId": "458f4aff-067f-4b75-a191-c76cedbc9bf2",
+      "credentials": {
+        "telegramApi": {
+          "id": "vHN9ozPSyOuWbWKc",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.text ?? $json.output ?? $json.response ?? '';\nlet d;\ntry {\n  const clean = String(raw).replace(/^```json\\s*/i, '').replace(/```$/,'').trim();\n  d = JSON.parse(clean);\n} catch (e) {\n  d = {\n    status: 'error',\n    worker: 'HORAS',\n    respuesta: String(raw || 'No se pudo interpretar la respuesta del especialista.'),\n    requires_human: true\n  };\n}\nreturn [{ json: {\n  status: d.status ?? 'success',\n  worker: d.worker ?? 'HORAS',\n  respuesta: d.respuesta ?? '',\n  requires_human: Boolean(d.requires_human)\n} }];"
+      },
+      "id": "fc6a6176-0fe3-4341-bec4-fc1fe792a18c",
+      "name": "Code in JavaScript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        368,
+        80
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "e4239e5e-ed8e-4f7d-8ab2-a261c0a62c2a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d1a344a6154f990bbb99d94ab8ce286129b7cbfc80509fc55bf0c73916889a09"
+  },
+  "nodeGroups": [],
+  "id": "T79TppkM89vnglrZ",
+  "tags": []
+}

@@ -1,0 +1,2179 @@
+{
+  "name": "Manager",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -2832,
+        528
+      ],
+      "id": "80c18d42-18f2-4921-b232-755af7ecbbba",
+      "name": "Telegram Trigger",
+      "webhookId": "d5a8776e-73fa-43ac-9e63-4da522304305",
+      "credentials": {
+        "telegramApi": {
+          "id": "vHN9ozPSyOuWbWKc",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('input').item.json.original_input }}",
+        "options": {
+          "systemMessage": "Sos el Router Manager de una mesa de ayuda interna empresarial.\nTu única tarea es clasificar y extraer datos. NO resuelvas el problema.\n\nDATOS YA CONOCIDOS DEL USUARIO:\n{{ $('Formatear historial').first().json.datos_clave }}\n\nMEMORIA DE LARGO PLAZO:\n{{ $('Formatear historial').first().json.last_summary }}\n\nÚLTIMAS INTERACCIONES:\n{{ $('Formatear historial').first().json.historial_previo }}\n\nMENSAJE ACTUAL:\n{{ $('input').item.json.original_input }}\n\nSi el mensaje actual es una continuación (\"sigue igual\", \"¿y eso?\", \"el mismo cliente\", \"ya lo probé\"), heredá intent, cliente y problema de las interacciones previas.\n\nIntent permitidos:\n- FACTURACION: cobros, pagos, facturas, suscripciones.\n- SOPORTE: acceso, errores, funcionamiento técnico, generacion y consulta de tickets.\n- HORAS: Registro de horas trabajadas.\n- RESUMEN: el usuario pide un resumen de lo conversado anteriormente o qué quedó pendiente.\n- UNKNOWN: ambiguo o fuera de alcance.\n\nRisk:\n- LOW: consulta informativa o diagnóstico seguro.\n- MEDIUM: podría implicar modificación o comunicación externa.\n- HIGH: dinero/reembolso de monto importante, eliminación, cambio irreversible o acción sensible.\n\nCampos a extraer (usá el mensaje actual Y los datos conocidos; si no hay dato nuevo, repetí el conocido; si no existe, dejá \"\"):\n- nombre: nombre con el que se presentó el usuario.\n- client: cliente al que se refiere el pedido.\n- problema: descripción breve (máx. 25 palabras) del problema o pedido en curso, integrando lo nuevo con lo anterior.\n- es_continuacion: true si el mensaje continúa un tema previo.\n\nConfidence: número entre 0 y 1 sobre la clasificación.\n\nRespondé SOLO JSON válido:\n{\n  \"intent\": \"SOPORTE\",\n  \"confidence\": 0.95,\n  \"risk\": \"LOW\",\n  \"client\": \"ARSAT\",\n  \"nombre\": \"Juan\",\n  \"problema\": \"No puede acceder al portal de facturación, error 403\",\n  \"es_continuacion\": false\n}\n",
+          "maxIterations": 5
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -1072,
+        576
+      ],
+      "id": "eb076636-6445-4df0-87a8-1bb7988c2154",
+      "name": "Router"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -1072,
+        832
+      ],
+      "id": "f83b1124-a113-4243-9b33-a0a89a261802",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "3C6YN9eZRt67gtNI",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f2d968a3-dd75-43fe-9c14-972fdef2205f",
+              "name": "original_input",
+              "value": "={{ ($json.message.text ?? $json.message.caption ?? '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "2034ff24-4998-4ef6-b64c-ecc3970dad99",
+              "name": "chat_id",
+              "value": "={{ $json.message.chat.id }}",
+              "type": "number"
+            },
+            {
+              "id": "b9324179-a1b5-47cf-b3d1-456c4dcd4ea3",
+              "name": "Fecha",
+              "value": "={{ $now }}",
+              "type": "string"
+            },
+            {
+              "id": "22d8c253-f693-4e4e-95d7-cc0baceae057",
+              "name": "supervisor_chat_id",
+              "type": "number",
+              "value": "={{ $json.message.chat.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -2624,
+        528
+      ],
+      "id": "682b93a5-f5f3-4be9-8259-f83ef0e2ac9e",
+      "name": "input"
+    },
+    {
+      "parameters": {
+        "jsCode": "const original = $('input').first().json.original_input;\nconst ctx = $('Formatear historial').first().json;\nlet prev = {};\ntry { prev = JSON.parse(ctx.datos_clave || '{}'); } catch (e) {}\n\nconst raw = $json.text ?? $json.output ?? $json.response ?? '';\nlet d;\ntry {\n  d = JSON.parse(String(raw).replace(/^```json\\s*/i,'').replace(/```$/,'').trim());\n} catch (e) {\n  d = { intent:'UNKNOWN', confidence:0, risk:'HIGH' };\n}\nconst allowed = ['FACTURACION','SOPORTE','HORAS','RESUMEN','UNKNOWN'];\nconst intent = allowed.includes(d.intent) ? d.intent : 'UNKNOWN';\nconst confidence = Math.max(0, Math.min(1, Number(d.confidence ?? 0)));\nconst risk = ['LOW','MEDIUM','HIGH'].includes(d.risk) ? d.risk : 'HIGH';\n\n// Nunca pisar un dato conocido con vacío\nconst pick = (nuevo, viejo) => String(nuevo ?? '').trim() || String(viejo ?? '').trim();\nconst nombre   = pick(d.nombre, prev.nombre) || ctx.user_name || '';\nconst client   = pick(d.client, prev.cliente);\nconst problema = pick(d.problema, prev.problema);\nconst es_continuacion = Boolean(d.es_continuacion);\n\nconst datos_clave = JSON.stringify({ nombre, cliente: client, problema, ultimo_intent: intent });\n\nconst contexto = [\n  `Usuario: ${nombre || 'desconocido'}`,\n  client   && `Cliente: ${client}`,\n  problema && `Problema en curso: ${problema}`,\n  ctx.last_summary && `Resumen previo: ${ctx.last_summary}`,\n  `Últimas interacciones:\\n${ctx.historial_previo}`,\n].filter(Boolean).join('\\n');\n\nconst mensaje_contextualizado = `${contexto}\\n\\nMENSAJE ACTUAL DEL USUARIO:\\n${original}`;\n\nreturn [{ json: {\n  original_input: original,\n  mensaje_contextualizado,\n  intent, confidence, risk, client,\n  nombre, problema, es_continuacion, datos_clave,\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -800,
+        576
+      ],
+      "id": "fa1f846b-228d-4678-b37e-5dfc110add2e",
+      "name": "Normalizacion contrato router"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d490ab6b-02e3-47bc-9edc-5fc0baae5ff6",
+              "name": "status",
+              "value": "need_human",
+              "type": "string"
+            },
+            {
+              "id": "784fb110-5f68-43a1-bcad-808d28607d57",
+              "name": "worker",
+              "value": "HITL",
+              "type": "string"
+            },
+            {
+              "id": "e71286f9-de27-4a19-91d4-e9ece5c4157a",
+              "name": "respuesta",
+              "value": "La solicitud necesita revision humana por riesgo alto, baja confianza o intencion no reconocida.",
+              "type": "string"
+            },
+            {
+              "id": "dc81b6f9-42b7-4faf-a088-5fe69d86596e",
+              "name": "requires_human",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -448,
+        1088
+      ],
+      "id": "abf4a887-e6bd-4fa2-8d88-24668e608a01",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "={{ $('input').first().json.supervisor_chat_id }}",
+        "message": "=🚨 APROBACIÓN REQUERIDA\n\nSe detectó una solicitud que supera los límites de ejecución automática.\n\n👤 Solicitante\n{{ $('Normalizacion contrato router').first().json.nombre || 'Sin nombre' }} (chat {{ $('input').first().json.chat_id }})\n\n📋 Solicitud\n{{ $('input').first().json.original_input }}\n\n🏷️ Clasificación\n• Área: {{ $('Normalizacion contrato router').first().json.intent }}\n• Confianza: {{ Math.round($('Normalizacion contrato router').first().json.confidence * 100) }}%\n• Riesgo: {{ $('Normalizacion contrato router').first().json.risk }}\n\n🛡️ Guardrail activado\nLa operación fue pausada automáticamente y no se ejecutará sin autorización humana.\n\n¿Autorizás continuar con la operación?",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "✅ Aprobar",
+            "disapproveLabel": "❌ Rechazar"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        144,
+        1088
+      ],
+      "id": "1a15a18a-3287-4f69-b9a4-638bf2e4a09c",
+      "name": "Send message and wait for response",
+      "webhookId": "ce8e4dfb-e732-485e-af8d-e6e23a228bc7",
+      "credentials": {
+        "telegramApi": {
+          "id": "vHN9ozPSyOuWbWKc",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "FACTURACION",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "d99332ef-3d21-47dd-92d0-a8faee9a2e9c"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "FACTURACION"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a950c2db-d4d5-454e-8e93-87e7d30e4ab6",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "SOPORTE",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "SOPORTE"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "0ecca81b-2c52-44ff-a391-7e963b3ee8c6",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "HORAS",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "HORAS"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "990f7a2b-5c25-487e-927b-1a2c06327f1f",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "RESUMEN",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "RESUMEN"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "f643db8b-9061-4fe4-9a8a-9f5959f8295d",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "UNKNOWN",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "UNKNOWN"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -352,
+        400
+      ],
+      "id": "210f083c-a83d-4743-ae3d-9105d8951b35",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "l5CRv44amgFyZ4kd",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/l5CRv44amgFyZ4kd",
+          "cachedResultName": "Worker 2 - Facturacion (PF)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "original_input": "={{ $json.mensaje_contextualizado }}",
+            "intent": "={{ $json.intent }}",
+            "confidence": "={{ $json.confidence }}",
+            "risk": "={{ $json.risk }}",
+            "client": "={{ $json.client }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "original_input",
+              "displayName": "original_input",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "risk",
+              "displayName": "risk",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "client",
+              "displayName": "client",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "4136db96-4a6f-4f7a-b7f6-8d700df0c824",
+      "name": "Ejecutar worker facturacion"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "iPzs8UEK7oTAH8QY",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/iPzs8UEK7oTAH8QY",
+          "cachedResultName": "Worker 1 - Soporte"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "original_input": "={{ $json.mensaje_contextualizado }}",
+            "intent": "={{ $json.intent }}",
+            "confidence": "={{ $json.confidence }}",
+            "risk": "={{ $json.risk }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "original_input",
+              "displayName": "original_input",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "risk",
+              "displayName": "risk",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        224
+      ],
+      "id": "e4a63f00-3f77-4f28-903e-1755beeda129",
+      "name": "Ejecutar worker soporte"
+    },
+    {
+      "parameters": {
+        "jsCode": "const hitl = $('Edit Fields').isExecuted;\nreturn $input.all().map(item => ({json:{\n  timestamp: new Date().toISOString(),\n  status: item.json.status ?? 'success',\n  worker: item.json.worker ?? 'N/D',\n  respuesta: item.json.respuesta || 'No pude generar una respuesta. Probá reformular tu consulta.',\n  requires_human: Boolean(item.json.requires_human) || hitl,\n}}));"
+      },
+      "id": "a0f335ad-7a58-4a48-b9a9-1101d287d84d",
+      "name": "Preparar respuesta final",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => ({json:{\n  ...item.json,\n  log:`${item.json.timestamp} | worker=${item.json.worker} | status=${item.json.status} | HITL=${item.json.requires_human}`\n}}));"
+      },
+      "id": "5101cada-ae3c-4886-9619-8e20f28519ff",
+      "name": "Log de ejecución",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1648,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1BrLCOt-GmcLYWybXwsKruenvOYF7jh67rOhTT2H_bwE",
+          "mode": "list",
+          "cachedResultName": "Log_multiagente",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1BrLCOt-GmcLYWybXwsKruenvOYF7jh67rOhTT2H_bwE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1BrLCOt-GmcLYWybXwsKruenvOYF7jh67rOhTT2H_bwE/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Fecha": "={{ $json.timestamp }}",
+            "Original_input": "={{ $('input').item.json.original_input }}",
+            "Intent": "={{ $('Normalizacion contrato router').item.json.intent }}",
+            "Confidence": "={{ $('Normalizacion contrato router').item.json.confidence }}",
+            "Risk": "={{ $('Normalizacion contrato router').item.json.risk }}",
+            "Worker": "={{ $json.worker }}",
+            "Status": "={{ $json.status }}",
+            "Respuesta": "={{ $json.respuesta }}",
+            "Requieres_human": "={{ $json.requires_human }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Fecha",
+              "displayName": "Fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Original_input",
+              "displayName": "Original_input",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Intent",
+              "displayName": "Intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Confidence",
+              "displayName": "Confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Risk",
+              "displayName": "Risk",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Worker",
+              "displayName": "Worker",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Respuesta",
+              "displayName": "Respuesta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Requieres_human",
+              "displayName": "Requieres_human",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Human_decision",
+              "displayName": "Human_decision",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1872,
+        352
+      ],
+      "id": "99128b80-07d9-491b-ab97-b3a5b014db02",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "DpkItDV0CWXdKdA0",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('input').item.json.chat_id }}",
+        "text": "={{ $('Preparar respuesta final').item.json.respuesta }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2512,
+        352
+      ],
+      "id": "38192c22-b72b-462d-a7ba-b25213eed524",
+      "name": "Send a text message",
+      "webhookId": "dd7b3f15-9265-4a21-a69d-6633a2265e92",
+      "credentials": {
+        "telegramApi": {
+          "id": "vHN9ozPSyOuWbWKc",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "T79TppkM89vnglrZ",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/T79TppkM89vnglrZ",
+          "cachedResultName": "Worker 3 - Horas"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $('input').item.json.chat_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        416
+      ],
+      "id": "542e8205-7682-4c76-bbde-72892e63dc59",
+      "name": "ejecutar worker horas"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Lee el registro de Airtable (aplanado o en .fields) y arma el contexto\nconst tg = $('Telegram Trigger').first().json.message.from;\nconst chat_id = $('input').first().json.chat_id;\nconst rec = $input.first()?.json ?? {};\nconst f = rec.fields ?? rec;\nconst existe = Boolean(rec.id);\n\nlet datos = {};\ntry { datos = JSON.parse(f['Datos clave'] || '{}'); } catch (e) {}\n\nreturn [{ json: {\n  record_id: existe ? rec.id : '',\n  Session_ID: chat_id,\n  user_name: datos.nombre || tg.first_name || 'Usuario',\n  status: f['Estado del proceso'] || 'En progreso',\n  last_summary: existe ? (f['Resumen de la conversacion'] || '') : '',\n  message_count: existe ? (Number(f['Mensajes']) || 0) : 0,\n  datos_clave: JSON.stringify(datos),\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1712,
+        560
+      ],
+      "id": "b5eaf189-c741-44cf-967e-9f18da37df90",
+      "name": "Contexto Memoria"
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appj1NPEOKlDep1w8",
+          "mode": "list",
+          "cachedResultName": "Memoria Largo Plazo",
+          "cachedResultUrl": "https://airtable.com/appj1NPEOKlDep1w8"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblAkXtJogkzASU9c",
+          "mode": "list",
+          "cachedResultName": "Table 1",
+          "cachedResultUrl": "https://airtable.com/appj1NPEOKlDep1w8/tblAkXtJogkzASU9c"
+        },
+        "filterByFormula": "={ID Usuario}&'' = '{{ $('input').first().json.chat_id }}'",
+        "returnAll": false,
+        "limit": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        -1936,
+        560
+      ],
+      "id": "184924b5-3a0e-4840-9fe7-c9b998d78b68",
+      "name": "Busca UserID",
+      "alwaysOutputData": true,
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "OxFVRuzLqk9a4Bvu",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('input').first().json.chat_id }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        -1536,
+        832
+      ],
+      "id": "ad07bc33-84d8-491e-aae2-c8c34c4b339a",
+      "name": "Memoria de corto plazo (Buffer)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx   = $('Formatear historial').first().json;\nconst inp   = $('input').first().json;\nconst final = $input.first().json;\nconst norm  = $('Normalizacion contrato router').first().json;\n\nconst turnos = (ctx.turnos || []).slice(-4);\nconst historial = [\n  ...turnos.map(t => `Usuario: ${t.human ?? ''}\\nAsistente: ${t.ai ?? ''}`),\n  `Usuario: ${inp.original_input}\\nAsistente: ${final.respuesta}`,\n].join('\\n\\n');\n\nconst message_count = (Number(ctx.message_count) || 0) + 1;\n\nreturn [{ json: {\n  ...final,\n  chat_id: inp.chat_id,\n  original_input: inp.original_input,\n  user_name: norm.nombre || ctx.user_name,\n  datos_clave: norm.datos_clave,\n  last_summary: ctx.last_summary,\n  historial,\n  message_count,\n  summarize: message_count % 5 === 0,\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        416
+      ],
+      "id": "42b5c711-7f59-46b0-9e5e-56de43366517",
+      "name": "Contar mensajes del chat"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e305b2e6-07e5-4a27-b1bc-fcea896aa83a",
+              "leftValue": "={{ $json.summarize }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c92e2c08-914f-40ab-adcb-7f2cb0a0c3b9",
+      "name": "¿Resumir? (cada 5)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        864,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base = $('Contar mensajes del chat').first().json;\nconst raw = $json.text ?? $json.output ?? $json.response ?? '';\nlet d;\ntry {\n  d = JSON.parse(String(raw).replace(/^```json\\s*/i,'').replace(/```$/,'').trim());\n} catch (e) {\n  d = { asunto_principal: base.last_summary, puntos_clave: [], accion_requerida: '', estado_caso: '' };\n}\nconst resumen = [d.asunto_principal, ...(Array.isArray(d.puntos_clave) ? d.puntos_clave : []), d.accion_requerida]\n  .filter(Boolean).join(' | ');\nreturn [{ json: {\n  ...base,\n  resumen_consolidado: resumen || base.last_summary,\n  estado_caso: d.estado_caso || 'En progreso',\n  fecha_actualizacion: new Date().toISOString(),\n}}];"
+      },
+      "id": "02f356be-b6e2-4593-9d56-4ddf101281e9",
+      "name": "Parsear resumen de memoria",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(i => {\n  const j = i.json;\n  const norm = $('Normalizacion contrato router').first().json;\n  const fallback = [norm.problema && `Problema en curso: ${norm.problema}`, norm.client && `Cliente: ${norm.client}`]\n    .filter(Boolean).join(' | ');\n  return { json: {\n    ...j,\n    resumen_consolidado: j.last_summary || fallback || 'Sin resumen aún',\n    fecha_actualizacion: new Date().toISOString(),\n  }};\n});"
+      },
+      "id": "8195c560-1979-4595-826f-106e258c461d",
+      "name": "Mantener memoria actual",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normaliza la salida del Chat Memory Manager (items {human, ai} o {messages:[...]})\nlet turnos = [];\nfor (const { json: j } of $input.all()) {\n  if (Array.isArray(j.messages)) turnos.push(...j.messages);\n  else if (j.human !== undefined || j.ai !== undefined) turnos.push(j);\n}\nturnos = turnos.filter(t => t && (t.human || t.ai)).slice(-5);\nconst historial_previo = turnos\n  .map(t => `Usuario: ${t.human ?? ''}\\nAsistente: ${t.ai ?? ''}`)\n  .join('\\n\\n');\nreturn [{ json: {\n  ...$('Contexto Memoria').first().json,\n  turnos,\n  historial_previo: historial_previo || 'Sin interacciones previas',\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1216,
+        576
+      ],
+      "id": "41bdd396-cedd-4f1b-aab9-531f6f4103e4",
+      "name": "Formatear historial"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "37063696-36a0-419d-94a9-d8825e314e05",
+              "name": "status",
+              "value": "success",
+              "type": "string"
+            },
+            {
+              "id": "ad6dab7a-a7d2-4552-ba45-034c4eb37c3b",
+              "name": "worker",
+              "value": "MEMORIA",
+              "type": "string"
+            },
+            {
+              "id": "5ee4be38-d250-4dd2-9d40-f029be2067e1",
+              "name": "respuesta",
+              "type": "string",
+              "value": "=📝 Resumen de lo último conversado\n\n👤 {{ $('Normalizacion contrato router').first().json.nombre || 'Sin nombre registrado' }}\n🏢 Cliente: {{ $('Normalizacion contrato router').first().json.client || '-' }}\n🔧 Problema en curso: {{ $('Normalizacion contrato router').first().json.problema || '-' }}\n\n{{ $('Formatear historial').first().json.last_summary }}\n\nÚltimas interacciones:\n{{ $('Formatear historial').first().json.historial_previo }}"
+            },
+            {
+              "id": "9e917179-d11d-490d-b888-56fa095c3e55",
+              "name": "requires_human",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        640
+      ],
+      "id": "3b8e6540-ee4c-4ab0-b8e0-06d0da1c7022",
+      "name": "Responder resumen"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "user",
+              "message": "={{ $('input').first().json.original_input }}"
+            },
+            {
+              "type": "ai",
+              "message": "={{ $('Preparar respuesta final').first().json.respuesta }}"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "typeVersion": 1.1,
+      "position": [
+        2736,
+        528
+      ],
+      "id": "85c0ab61-3ec0-4d28-8a9a-7c75f3ebf81e",
+      "name": "Guardar turno"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8369ec68-41bb-4d5f-b235-80e2741ac710",
+              "leftValue": "={{ $('Contexto Memoria').first().json.record_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2064,
+        352
+      ],
+      "id": "b21adfc9-345f-4216-bebf-8da074a0df70",
+      "name": "¿Registro existente?"
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appj1NPEOKlDep1w8",
+          "mode": "list",
+          "cachedResultName": "Memoria Largo Plazo",
+          "cachedResultUrl": "https://airtable.com/appj1NPEOKlDep1w8"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblAkXtJogkzASU9c",
+          "mode": "list",
+          "cachedResultName": "Table 1",
+          "cachedResultUrl": "https://airtable.com/appj1NPEOKlDep1w8/tblAkXtJogkzASU9c"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Contexto Memoria').first().json.record_id }}",
+            "Resumen de la conversacion": "={{ $('Log de ejecución').first().json.resumen_consolidado }}",
+            "Fecha ultima actualizacion": "={{ $now.toISO() }}",
+            "Estado del proceso": "En progreso",
+            "Mensajes": "={{ $('Log de ejecución').first().json.message_count }}",
+            "Datos clave": "={{ $('Normalizacion contrato router').first().json.datos_clave }}",
+            "Proximos pasos": "={{ $('Normalizacion contrato router').first().json.problema }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "ID Usuario",
+              "displayName": "ID Usuario",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Fecha ultima actualizacion",
+              "displayName": "Fecha ultima actualizacion",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Resumen de la conversacion",
+              "displayName": "Resumen de la conversacion",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Estado del proceso",
+              "displayName": "Estado del proceso",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Pendiente",
+                  "value": "Pendiente"
+                },
+                {
+                  "name": "En progreso",
+                  "value": "En progreso"
+                },
+                {
+                  "name": "Cerrado",
+                  "value": "Cerrado"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Proximos pasos",
+              "displayName": "Proximos pasos",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Datos clave",
+              "displayName": "Datos clave",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Mensajes",
+              "displayName": "Mensajes",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        2288,
+        240
+      ],
+      "id": "97b15ac4-70bb-4faf-a1ec-8849aaac555a",
+      "name": "Actualizar memoria largo plazo",
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "OxFVRuzLqk9a4Bvu",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appj1NPEOKlDep1w8",
+          "mode": "list",
+          "cachedResultName": "Memoria Largo Plazo",
+          "cachedResultUrl": "https://airtable.com/appj1NPEOKlDep1w8"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblAkXtJogkzASU9c",
+          "mode": "list",
+          "cachedResultName": "Table 1",
+          "cachedResultUrl": "https://airtable.com/appj1NPEOKlDep1w8/tblAkXtJogkzASU9c"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID Usuario": "={{ $('input').first().json.chat_id }}",
+            "Resumen de la conversacion": "={{ $('Log de ejecución').first().json.resumen_consolidado }}",
+            "Fecha ultima actualizacion": "={{ $now.toISO() }}",
+            "Estado del proceso": "En progreso",
+            "Mensajes": "={{ $('Log de ejecución').first().json.message_count }}",
+            "Datos clave": "={{ $('Normalizacion contrato router').first().json.datos_clave }}",
+            "Proximos pasos": "={{ $('Normalizacion contrato router').first().json.problema }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ID Usuario",
+              "displayName": "ID Usuario",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Fecha ultima actualizacion",
+              "displayName": "Fecha ultima actualizacion",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Resumen de la conversacion",
+              "displayName": "Resumen de la conversacion",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Estado del proceso",
+              "displayName": "Estado del proceso",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Pendiente",
+                  "value": "Pendiente"
+                },
+                {
+                  "name": "En progreso",
+                  "value": "En progreso"
+                },
+                {
+                  "name": "Cerrado",
+                  "value": "Cerrado"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Proximos pasos",
+              "displayName": "Proximos pasos",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Datos clave",
+              "displayName": "Datos clave",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Mensajes",
+              "displayName": "Mensajes",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        2288,
+        480
+      ],
+      "id": "3acaf0e5-ad8f-4c03-981b-a69810fa1daa",
+      "name": "Crear memoria largo plazo",
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "OxFVRuzLqk9a4Bvu",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "bbb68765-07f6-4345-9330-bfc9d53aa713",
+              "leftValue": "={{ $json.original_input !== '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2464,
+        528
+      ],
+      "id": "d89bdb90-feb3-44b1-ab56-465f32d483ce",
+      "name": "¿Mensaje de texto?"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('input').first().json.chat_id }}",
+        "text": "Por ahora solo puedo procesar mensajes de texto. ✍️",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -2208,
+        768
+      ],
+      "id": "38050d47-423c-40b7-bbdb-7b05cfe72546",
+      "name": "Avisar solo texto",
+      "webhookId": "0302bf76-0efa-48cd-bb74-98e3823df9ee",
+      "credentials": {
+        "telegramApi": {
+          "id": "vHN9ozPSyOuWbWKc",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0b2fedc3-818b-414e-87c6-919f47770351",
+              "leftValue": "={{ $json.original_input.toLowerCase() === '/reset' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2208,
+        512
+      ],
+      "id": "b7b06657-bf1b-4bb1-b405-3412ca3c6b19",
+      "name": "¿Comando reset?"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('input').first().json.chat_id }}",
+        "text": "⏳ Tu solicitud requiere aprobación de un supervisor. Te aviso apenas tenga respuesta.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -144,
+        1088
+      ],
+      "id": "a1bd3010-91fd-4df3-9ee2-9f70081a699e",
+      "name": "Avisar pendiente de aprobación",
+      "webhookId": "7766be87-0378-46d1-9c2b-9ef3bc5d2f2b",
+      "credentials": {
+        "telegramApi": {
+          "id": "vHN9ozPSyOuWbWKc",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "572044b3-243a-4188-b7eb-bf554ce1876a",
+              "leftValue": "={{ $json.data?.approved === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        464,
+        1088
+      ],
+      "id": "f12730d5-ad47-4d04-a18f-ecc0dcfcf077",
+      "name": "¿Aprobado?"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ...$('Normalizacion contrato router').first().json, aprobado_por_supervisor: true } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        848
+      ],
+      "id": "4ff78424-6e55-4b39-9a73-9c46a6fd170a",
+      "name": "Restaurar solicitud aprobada"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "22c82521-5c8b-43ec-b754-255d21622e56",
+              "name": "status",
+              "value": "rejected",
+              "type": "string"
+            },
+            {
+              "id": "8ecdf19a-894c-429a-a491-0a59885374b5",
+              "name": "worker",
+              "value": "HITL",
+              "type": "string"
+            },
+            {
+              "id": "f19666eb-9e81-478c-a4af-a896b4ed6c1a",
+              "name": "respuesta",
+              "value": "❌ Tu solicitud fue rechazada por un supervisor. Si necesitás más detalle, contactá a tu referente.",
+              "type": "string"
+            },
+            {
+              "id": "1b800dd4-42f4-473b-b2e2-189a5fbf202d",
+              "name": "requires_human",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        816,
+        1072
+      ],
+      "id": "7a58f348-c062-4c15-a72c-fef35ff675b0",
+      "name": "Solicitud rechazada"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "99b14c36-8731-4b01-9c53-c3062e7531e7",
+              "name": "status",
+              "value": "unknown",
+              "type": "string"
+            },
+            {
+              "id": "0b6dc571-b0b8-43ee-bbd9-5173d3bb727c",
+              "name": "worker",
+              "value": "ROUTER",
+              "type": "string"
+            },
+            {
+              "id": "e7072b25-ef0e-47b1-95e5-4e3d12c7d22e",
+              "name": "respuesta",
+              "value": "🤔 No logré identificar si tu consulta es de facturación, soporte o registro de horas. ¿Podés darme un poco más de detalle?",
+              "type": "string"
+            },
+            {
+              "id": "9f3dac57-da74-4e31-9193-011998726966",
+              "name": "requires_human",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        832
+      ],
+      "id": "705557d9-537b-42a0-b43b-cd2bc239e81a",
+      "name": "Pedir reformulación"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "28bdfa53-dde4-4f61-bbb9-f64089d4f428",
+              "leftValue": "={{ !['UNKNOWN','RESUMEN'].includes($json.intent) && ($json.risk === 'HIGH' || Number($json.confidence) < 0.5) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -608,
+        576
+      ],
+      "id": "df536177-74c6-4fc9-8d88-8e15f5b5af9d",
+      "name": "¿Requiere aprobación? (HITL)"
+    },
+    {
+      "parameters": {
+        "mode": "delete",
+        "deleteMode": "all"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "typeVersion": 1.1,
+      "position": [
+        -1856,
+        368
+      ],
+      "id": "b17f7101-c346-4c5b-a63f-e4613eebf160",
+      "name": "Borrar memoria corto plazo"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('input').first().json.chat_id }}",
+        "text": "🧹 Memoria de la conversación borrada. Empecemos de nuevo.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1584,
+        368
+      ],
+      "id": "a4ff2a14-2e77-454f-b02b-33ed5977f26e",
+      "name": "Confirmar reset de memoria",
+      "webhookId": "fe7755d7-a559-4263-8550-8fc0133a376f",
+      "credentials": {
+        "telegramApi": {
+          "id": "vHN9ozPSyOuWbWKc",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "typeVersion": 1.1,
+      "position": [
+        -1504,
+        576
+      ],
+      "id": "a51a03aa-1b43-437e-ac37-0824549ebe4b",
+      "name": "Cargar memoria corto plazo",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1168,
+        544
+      ],
+      "id": "3026e18e-719d-4c00-b988-aeefad3cd7c8",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Sos el componente de consolidación de memoria. NO respondas al usuario.\nDATOS CLAVE: {{ $json.datos_clave }}\nMEMORIA PREVIA: {{ $json.last_summary || 'Sin memoria previa' }}\nÚLTIMAS 5 INTERACCIONES:\n{{ $json.historial }}\nIntegrá lo nuevo con la memoria previa en un resumen único y breve. Guardá solo información útil para una conversación futura (clientes, pedidos, tickets, pendientes). No guardes saludos, logs, payloads, contraseñas ni tokens.\nRespondé SOLO JSON válido, sin texto adicional:\n{\"asunto_principal\":\"\",\"puntos_clave\":[],\"accion_requerida\":\"\",\"estado_caso\":\"\"}"
+      },
+      "id": "d44cd379-ff33-44fe-a77e-0e932782d8ab",
+      "name": "Sumarizador",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [
+        1120,
+        336
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Router",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router": {
+      "main": [
+        [
+          {
+            "node": "Normalizacion contrato router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "input": {
+      "main": [
+        [
+          {
+            "node": "¿Mensaje de texto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizacion contrato router": {
+      "main": [
+        [
+          {
+            "node": "¿Requiere aprobación? (HITL)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Avisar pendiente de aprobación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Ejecutar worker facturacion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ejecutar worker soporte",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ejecutar worker horas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder resumen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pedir reformulación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar respuesta final": {
+      "main": [
+        [
+          {
+            "node": "Contar mensajes del chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecutar worker facturacion": {
+      "main": [
+        [
+          {
+            "node": "Preparar respuesta final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecutar worker soporte": {
+      "main": [
+        [
+          {
+            "node": "Preparar respuesta final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message and wait for response": {
+      "main": [
+        [
+          {
+            "node": "¿Aprobado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log de ejecución": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "¿Registro existente?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ejecutar worker horas": {
+      "main": [
+        [
+          {
+            "node": "Preparar respuesta final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contexto Memoria": {
+      "main": [
+        [
+          {
+            "node": "Cargar memoria corto plazo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Busca UserID": {
+      "main": [
+        [
+          {
+            "node": "Contexto Memoria",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memoria de corto plazo (Buffer)": {
+      "ai_memory": [
+        [
+          {
+            "node": "Cargar memoria corto plazo",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Guardar turno",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Borrar memoria corto plazo",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contar mensajes del chat": {
+      "main": [
+        [
+          {
+            "node": "¿Resumir? (cada 5)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear resumen de memoria": {
+      "main": [
+        [
+          {
+            "node": "Log de ejecución",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mantener memoria actual": {
+      "main": [
+        [
+          {
+            "node": "Log de ejecución",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Resumir? (cada 5)": {
+      "main": [
+        [
+          {
+            "node": "Sumarizador",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mantener memoria actual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear historial": {
+      "main": [
+        [
+          {
+            "node": "Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder resumen": {
+      "main": [
+        [
+          {
+            "node": "Preparar respuesta final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        [
+          {
+            "node": "Guardar turno",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Registro existente?": {
+      "main": [
+        [
+          {
+            "node": "Actualizar memoria largo plazo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Crear memoria largo plazo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Actualizar memoria largo plazo": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crear memoria largo plazo": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Mensaje de texto?": {
+      "main": [
+        [
+          {
+            "node": "¿Comando reset?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Avisar solo texto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Comando reset?": {
+      "main": [
+        [
+          {
+            "node": "Borrar memoria corto plazo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Busca UserID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Avisar pendiente de aprobación": {
+      "main": [
+        [
+          {
+            "node": "Send message and wait for response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Aprobado?": {
+      "main": [
+        [
+          {
+            "node": "Restaurar solicitud aprobada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Solicitud rechazada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restaurar solicitud aprobada": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Solicitud rechazada": {
+      "main": [
+        [
+          {
+            "node": "Preparar respuesta final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pedir reformulación": {
+      "main": [
+        [
+          {
+            "node": "Preparar respuesta final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Requiere aprobación? (HITL)": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Borrar memoria corto plazo": {
+      "main": [
+        [
+          {
+            "node": "Confirmar reset de memoria",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cargar memoria corto plazo": {
+      "main": [
+        [
+          {
+            "node": "Formatear historial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Sumarizador",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sumarizador": {
+      "main": [
+        [
+          {
+            "node": "Parsear resumen de memoria",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "f7ab0ee4-903a-471e-a796-40c5c078e1f6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d1a344a6154f990bbb99d94ab8ce286129b7cbfc80509fc55bf0c73916889a09"
+  },
+  "nodeGroups": [],
+  "id": "jp2FpNOmZ1tTKmJ7",
+  "tags": []
+}
