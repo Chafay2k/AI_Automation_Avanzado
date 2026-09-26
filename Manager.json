@@ -71,14 +71,14 @@
             {
               "id": "f2d968a3-dd75-43fe-9c14-972fdef2205f",
               "name": "original_input",
-              "value": "={{ ($json.message.text ?? $json.message.caption ?? '').trim() }}",
+              "value": "={{ ($json.message?.text ?? $json.message?.caption ?? '').trim() || ($('Limpia mail').isExecuted ? $('Limpia mail').item.json.BodyText : '') }}",
               "type": "string"
             },
             {
               "id": "2034ff24-4998-4ef6-b64c-ecc3970dad99",
               "name": "chat_id",
-              "value": "={{ $json.message.chat.id }}",
-              "type": "number"
+              "value": "={{ $json.message?.chat?.id || ($('Limpia mail').isExecuted ? $('Limpia mail').item.json.chat_id : '') }}",
+              "type": "string"
             },
             {
               "id": "b9324179-a1b5-47cf-b3d1-456c4dcd4ea3",
@@ -91,10 +91,18 @@
               "name": "supervisor_chat_id",
               "type": "number",
               "value": "={{ $json.message.chat.id }}"
+            },
+            {
+              "id": "7fdead6b-c0e4-4e1e-8232-adf7c1bddee4",
+              "name": "canal",
+              "value": "={{ $json.message?.message_id ? 'Telegram' : ($('Gmail Trigger').isExecuted && $('Gmail Trigger').item.json.id ? 'Mail' : '') }}",
+              "type": "string"
             }
           ]
         },
-        "options": {}
+        "options": {
+          "ignoreConversionErrors": false
+        }
       },
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.5,
@@ -428,7 +436,9 @@
             "original_input": "={{ $json.mensaje_contextualizado }}",
             "intent": "={{ $json.intent }}",
             "confidence": "={{ $json.confidence }}",
-            "risk": "={{ $json.risk }}"
+            "risk": "={{ $json.risk }}",
+            "Canal": "={{ $('input').item.json.canal }}",
+            "Mail": "={{ $('Limpia mail').item.json.From }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -462,6 +472,24 @@
             {
               "id": "risk",
               "displayName": "risk",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Canal",
+              "displayName": "Canal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Mail",
+              "displayName": "Mail",
               "required": false,
               "defaultMatch": false,
               "display": true,
@@ -673,8 +701,8 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        2512,
-        352
+        3024,
+        480
       ],
       "id": "38192c22-b72b-462d-a7ba-b25213eed524",
       "name": "Send a text message",
@@ -730,7 +758,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Lee el registro de Airtable (aplanado o en .fields) y arma el contexto\nconst tg = $('Telegram Trigger').first().json.message.from;\nconst chat_id = $('input').first().json.chat_id;\nconst rec = $input.first()?.json ?? {};\nconst f = rec.fields ?? rec;\nconst existe = Boolean(rec.id);\n\nlet datos = {};\ntry { datos = JSON.parse(f['Datos clave'] || '{}'); } catch (e) {}\n\nreturn [{ json: {\n  record_id: existe ? rec.id : '',\n  Session_ID: chat_id,\n  user_name: datos.nombre || tg.first_name || 'Usuario',\n  status: f['Estado del proceso'] || 'En progreso',\n  last_summary: existe ? (f['Resumen de la conversacion'] || '') : '',\n  message_count: existe ? (Number(f['Mensajes']) || 0) : 0,\n  datos_clave: JSON.stringify(datos),\n}}];"
+        "jsCode": "// Lee el registro de Airtable (aplanado o en .fields) y arma el contexto\nconst getVal = (fn) => { try { return fn(); } catch { return undefined; } };\n\nconst tg = getVal(() => $('Telegram Trigger').first().json.message.from)\n        ?? getVal(() => $('Gmail Trigger').first().json.From);\n\n// Nombre del remitente: objeto de Telegram o string de Gmail (\"Nombre\" <mail>)\nconst nombre_origen = typeof tg === 'object'\n  ? tg?.first_name\n  : String(tg ?? '').split('<')[0].replace(/\"/g, '').trim();\n\nconst chat_id = $('input').first().json.chat_id;\nconst rec = $input.first()?.json ?? {};\nconst f = rec.fields ?? rec;\nconst existe = Boolean(rec.id);\n\nlet datos = {};\ntry { datos = JSON.parse(f['Datos clave'] || '{}'); } catch (e) {}\n\nreturn [{ json: {\n  record_id: existe ? rec.id : '',\n  Session_ID: chat_id,\n  user_name: datos.nombre || nombre_origen || 'Usuario',\n  status: f['Estado del proceso'] || 'En progreso',\n  last_summary: existe ? (f['Resumen de la conversacion'] || '') : '',\n  message_count: existe ? (Number(f['Mensajes']) || 0) : 0,\n  datos_clave: JSON.stringify(datos),\n}}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -940,8 +968,8 @@
       "type": "@n8n/n8n-nodes-langchain.memoryManager",
       "typeVersion": 1.1,
       "position": [
-        2736,
-        528
+        3456,
+        480
       ],
       "id": "85c0ab61-3ec0-4d28-8a9a-7c75f3ebf81e",
       "name": "Guardar turno"
@@ -1173,7 +1201,7 @@
               "defaultMatch": false,
               "canBeUsedToMatch": true,
               "display": true,
-              "type": "number",
+              "type": "string",
               "readOnly": false,
               "removed": false
             },
@@ -1219,6 +1247,14 @@
                 {
                   "name": "Cerrado",
                   "value": "Cerrado"
+                },
+                {
+                  "name": "Activo",
+                  "value": "Activo"
+                },
+                {
+                  "name": "nuevo",
+                  "value": "nuevo"
                 }
               ],
               "readOnly": false,
@@ -1649,6 +1685,452 @@
         1120,
         336
       ]
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "maxResults": 2,
+        "filters": {
+          "readStatus": "unread"
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -2832,
+        -256
+      ],
+      "id": "d1af63f0-0e9b-4f7a-aa3b-90787bf2948e",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gV6UmC9X5gTRnyO5",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0fd4e26b-9ab6-4089-bb89-4fab4b9f581a",
+              "leftValue": "={{ $json.subject ?? '' }}",
+              "rightValue": "Auto-reply",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "4f5442be-6ea2-437c-9332-82b237719cc2",
+              "leftValue": "={{ $json.subject ?? '' }}",
+              "rightValue": "Out of Office",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "b2086010-45b2-4364-bcf0-1a386a2c4e23",
+              "leftValue": "={{ $json.subject ?? '' }}",
+              "rightValue": "Undeliverable",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "08a28bd4-5063-43be-a02c-c21769e8074b",
+              "leftValue": "={{ $json.subject ?? '' }}",
+              "rightValue": "no-reply@",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2656,
+        -256
+      ],
+      "id": "e8d3df25-0f14-4551-ba8c-4e9d5d1d383d",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const src=$('Limpia mail').first().json;\nconst raw=$json.text ?? $json.output ?? $json.response ?? '';\nlet d; try{d=JSON.parse(String(raw).replace(/^```json\\s*/i,'').replace(/```$/,'').trim());}\ncatch(e){d={intent:'UNKNOWN',confidence:0,risk:'HIGH',draft_body:'Requiere revisión humana.'};}\nreturn [{json:{...src,...d}}];"
+      },
+      "id": "c4e46144-9735-4fb6-9060-1c7d7c24c453",
+      "name": "Normalizar Triage Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1920,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b416e06d-4df7-41fe-a8ed-931551007508",
+              "leftValue": "={{ Boolean($json.id) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "daba36fc-9233-4432-90e2-339dbb31d853",
+      "name": "¿Contacto existe?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1552,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "email": "={{ $('Normalizar Triage Email').item.json.From }}",
+        "additionalFields": {},
+        "options": {}
+      },
+      "id": "78caf01f-16b0-4841-8c51-14a236e1cf47",
+      "name": "HubSpot - Update contacto",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        -1328,
+        -144
+      ],
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "11Gnmg2iiOZfOJ9z",
+          "name": "HubSpot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "email": "={{ $('Normalizar Triage Email').first().json.From }}",
+        "additionalFields": {},
+        "options": {}
+      },
+      "id": "39acdf29-da3c-425e-bc78-0b96efdc2bb4",
+      "name": "HubSpot - Create contacto",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        -1328,
+        48
+      ],
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "11Gnmg2iiOZfOJ9z",
+          "name": "HubSpot account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "48dae925-e00b-4f49-aea2-91e0b10f81c1",
+      "name": "ignora auto-replay",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -2416,
+        -384
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Sos el agente de triaje de la casilla de soporte.\nAnalizá únicamente estos datos limpios:\nFrom: {{ $json.From }}\nSubject: {{ $json.Subject }}\nBodyText: {{ $json.BodyText }}\n\nClasificá con taxonomía cerrada:\nFACTURACION, SOPORTE, HORAS, UNKNOWN.\n\nRespondé SOLO JSON válido:\n{\"intent\":\"TECH_SUPPORT\",\"confidence\":0.95,\"risk\":\"LOW\",\"draft_body\":\"Borrador breve y profesional para responder al cliente.\"}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -2240,
+        -144
+      ],
+      "id": "9884f82b-c55c-4392-b927-f6f86aff72aa",
+      "name": "Analisis de mail"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-120b",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -2240,
+        80
+      ],
+      "id": "3d3f474b-d2d8-404a-8a35-30f8e08ac114",
+      "name": "Groq Chat Model1",
+      "credentials": {
+        "groqApi": {
+          "id": "3C6YN9eZRt67gtNI",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "384cdbf1-51f8-4c3b-9a0c-6f5eea9a64c8",
+              "name": "From",
+              "value": "={{ $json.From.match(/<([^>]+)>/)?.[1] ?? $json.From }}",
+              "type": "string"
+            },
+            {
+              "id": "fa89918d-50ad-4323-a213-45bdaf265831",
+              "name": "Subject",
+              "value": "={{ $json.Subject ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "93cfbcb3-1db9-4fb5-a790-3b76c3c63220",
+              "name": "BodyText",
+              "value": "={{ $json.textPlain ?? $json.text ?? $json.snippet ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "d56561b3-3154-4c47-ad9d-658379d9bc6e",
+              "name": "chat_id",
+              "value": "={{ $json.threadId }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f2856f9c-2cfb-4af0-9308-a965068fe5e6",
+      "name": "Limpia mail",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2416,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "search",
+        "filterGroupsUi": {
+          "filterGroupsValues": [
+            {
+              "filtersUi": {
+                "filterValues": [
+                  {
+                    "propertyName": "email|string",
+                    "value": "={{ $json.From }}"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "bec75460-6c7e-4b8e-b928-0677784268cd",
+      "name": "HubSpot - busca contacto",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        -1728,
+        -144
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "11Gnmg2iiOZfOJ9z",
+          "name": "HubSpot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('input').item.json.canal }}",
+                    "rightValue": "Mail",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "6b71db9a-1e6c-4ba0-ba95-1e6a7c859fa3"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Mail"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "995e30f0-667c-4090-9c37-4775cb9c6980",
+                    "leftValue": "={{ $('input').item.json.canal }}",
+                    "rightValue": "Telegram",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Telegram"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        2496,
+        352
+      ],
+      "id": "f9e1df16-52d0-4fae-b8ad-31ac9b4a1183",
+      "name": "Switch1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6cc61e46-c7b1-4d09-87f5-5785a4e34646",
+              "name": "text",
+              "value": "={{ '📩 Nuevo caso procesado\\nCliente: ' + $('Limpia mail').first().json.From + '\\nAsunto: ' + $('Limpia mail').first().json.Subject + '\\nIntent: ' + $('Normalizar Triage Email').first().json.intent + '\\nEstado: borrador creado para revisión humana' + '\\nCanal: ' + $('input').item.json.canal}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0f109865-eb6f-4cc3-be29-3a82a3b7dee7",
+      "name": "Set - Payload mínimo Slack",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3024,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0C1VU3CQGH",
+          "mode": "list",
+          "cachedResultName": "ingreso_incidentes"
+        },
+        "text": "={{ $json.text }}",
+        "otherOptions": {}
+      },
+      "id": "2944c4b1-93f1-4dfb-8fa5-495dd7e2d2ab",
+      "name": "Slack - Alertar Operaciones",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        3264,
+        208
+      ],
+      "webhookId": "37c3e129-539e-440d-a200-c0c13065d1b4",
+      "credentials": {
+        "slackApi": {
+          "id": "G9N5Cmxgcxj0FBM5",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "={{ $('Gmail Trigger').item.json.Subject }}",
+        "message": "={{ $('Preparar respuesta final').item.json.respuesta }}",
+        "options": {
+          "threadId": "={{ $('Gmail Trigger').item.json.threadId }}"
+        }
+      },
+      "id": "bf56b335-2797-4f18-86fb-d9a95cd0b4c8",
+      "name": "Crea Draft HITL",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2784,
+        208
+      ],
+      "webhookId": "59556466-c1e4-4a19-9868-7dd192e0f4e7",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gV6UmC9X5gTRnyO5",
+          "name": "Gmail account"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -1984,7 +2466,7 @@
       "main": [
         [
           {
-            "node": "Send a text message",
+            "node": "Switch1",
             "type": "main",
             "index": 0
           }
@@ -1995,7 +2477,7 @@
       "main": [
         [
           {
-            "node": "Send a text message",
+            "node": "Switch1",
             "type": "main",
             "index": 0
           }
@@ -2161,6 +2643,181 @@
           }
         ]
       ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar Triage Email": {
+      "main": [
+        [
+          {
+            "node": "HubSpot - busca contacto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Contacto existe?": {
+      "main": [
+        [
+          {
+            "node": "HubSpot - Update contacto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HubSpot - Create contacto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "ignora auto-replay",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Limpia mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Analisis de mail",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analisis de mail": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Triage Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limpia mail": {
+      "main": [
+        [
+          {
+            "node": "Analisis de mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot - busca contacto": {
+      "main": [
+        [
+          {
+            "node": "¿Contacto existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot - Create contacto": {
+      "main": [
+        [
+          {
+            "node": "input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot - Update contacto": {
+      "main": [
+        [
+          {
+            "node": "input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch1": {
+      "main": [
+        [
+          {
+            "node": "Crea Draft HITL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set - Payload mínimo Slack": {
+      "main": [
+        [
+          {
+            "node": "Slack - Alertar Operaciones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crea Draft HITL": {
+      "main": [
+        [
+          {
+            "node": "Set - Payload mínimo Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack - Alertar Operaciones": {
+      "main": [
+        [
+          {
+            "node": "Guardar turno",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -2168,7 +2825,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "f7ab0ee4-903a-471e-a796-40c5c078e1f6",
+  "versionId": "ead8c0fd-2e69-4b7f-8c4e-c45e44ca1d5d",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "d1a344a6154f990bbb99d94ab8ce286129b7cbfc80509fc55bf0c73916889a09"
